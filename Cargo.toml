@@ -1,0 +1,34 @@
+[workspace]
+members = [
+  "bin/bridge/",
+  # "crates/http/",
+  # "crates/adapters/",
+  # "examples/across",
+]
+default-members = ["bin/bridge"]
+
+# Explicitly set the resolver to version 2, which is the default for packages with edition >= 2021
+# https://doc.rust-lang.org/edition-guide/rust-2021/default-cargo-resolver.html
+resolver = "2"
+
+[workspace.lints]
+rust.missing_debug_implementations = "warn"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+license = "MIT OR Apache-2.0"
+homepage = "https://tsumori-ui.vercel.app/"
+repository = "https://github.com/tsumori-io/tsumori-bridge"
+exclude = [".github/"]
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"
+
+[workspace.dependencies]
+# tsumori-bridge
+bridge = { path = "bin/bridge" }
+# http = { path = "crates/http" }
+# adapters = { path = "crates/adapters" }

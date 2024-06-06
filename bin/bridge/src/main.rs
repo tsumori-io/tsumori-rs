@@ -1,4 +1,6 @@
 
+use http;
+
 use clap::{Parser, Subcommand};
 
 pub(crate) const SHORT_VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
@@ -36,6 +38,11 @@ struct ServerCommand {
 
 impl ServerCommand {
     fn execute(&self) -> Result<(), String> {
+        crate::http::run_server(http::ServerConfig {
+            port: self.port,
+            req_timeout: self.req_timeout,
+            metrics_port: self.metrics_port,
+        });
         Ok(())
     }
 }

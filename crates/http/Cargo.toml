@@ -1,0 +1,27 @@
+[package]
+name = "http"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+exclude.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lints]
+workspace = true
+
+[dependencies]
+axum = { version = "0.7.5" }
+hyper = { version = "1.3.1", features = [] }
+hyper-util = { version = "0.1.5", features = ["tokio", "server-auto", "http1"] }
+metrics = "0.23.0"
+metrics-exporter-prometheus = "0.15.0"
+reqwest = { version = "0.12.4" }
+tokio = { version = "1.38.0", features = ["full"] }
+tower = { version = "0.4.13", features = ["util"] }
+tower-http = { version = "0.5.2", features = ["timeout", "trace"] }
+tracing = { version = "0.1.40" }
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

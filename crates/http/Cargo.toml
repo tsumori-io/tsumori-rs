@@ -20,6 +20,7 @@ hyper-util = { version = "0.1.5", features = ["tokio", "server-auto", "http1"] }
 metrics = "0.23.0"
 metrics-exporter-prometheus = "0.15.0"
 reqwest = { version = "0.12.4" }
+serde_json = "1.0.117"
 tokio = { version = "1.38.0", features = ["full"] }
 tower = { version = "0.4.13", features = ["util"] }
 tower-http = { version = "0.5.2", features = ["timeout", "trace"] }

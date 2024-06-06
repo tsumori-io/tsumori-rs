@@ -1,7 +1,7 @@
 [workspace]
 members = [
   "bin/bridge/",
-  # "crates/http/",
+  "crates/http/",
   # "crates/adapters/",
   # "examples/across",
 ]
@@ -30,5 +30,5 @@ strip = "debuginfo"
 [workspace.dependencies]
 # tsumori-bridge
 bridge = { path = "bin/bridge" }
-# http = { path = "crates/http" }
+http = { path = "crates/http" }
 # adapters = { path = "crates/adapters" }

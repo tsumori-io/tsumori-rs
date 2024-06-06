@@ -3,7 +3,8 @@ use std::{convert::Infallible, future::ready, time::{Duration, Instant}};
 use axum::{
     body::{Body, Bytes},
     extract::{MatchedPath, Request, State},
-    http::{HeaderMap, HeaderName, HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Method},
+    Json,
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
@@ -13,24 +14,29 @@ use tower_http::{
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
+use serde_json::{json, Value};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
 use tracing::Span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 mod http_metrics;
 
+pub(crate) const PKG_NAME: &str = concat!("", env!("CARGO_PKG_NAME"));
+pub(crate) const VERSION: &str = concat!("v", env!("CARGO_PKG_VERSION"));
+
 #[derive(Debug)]
 pub struct ServerConfig {
     pub port: u16,
     pub req_timeout: u8,
     pub metrics_port: u16,
+    pub log_level: String,
 }
 
 pub fn run_server(cfg: ServerConfig) {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "http=info,tower_http=debug".into()), // note: `http` is the crate name
+                .unwrap_or_else(|_| format!("{}={},tower_http=debug", PKG_NAME, cfg.log_level).into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -54,6 +60,7 @@ pub fn run_server(cfg: ServerConfig) {
 async fn start_main_server(cfg: &ServerConfig) {
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
+        .route("/version", get(|| async { Json(json!({ "version": VERSION })) }))
         // Add some logging so we can see the streams going through
         .route_layer(middleware::from_fn(http_metrics::track_request_metrics))
         .layer((

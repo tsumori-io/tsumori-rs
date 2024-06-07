@@ -1,0 +1,35 @@
+name: Generate Documentation
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.ref_name }}
+        fetch-depth: 0
+
+    - uses: dtolnay/rust-toolchain@1.76
+      with:
+        toolchain: nightly
+
+    - name: Generate documentation
+      run: cargo doc --workspace --no-deps
+
+    - name: Upload crate doc as artifact
+      uses: actions/upload-artifact@v4
+      # TODO improve to upload all relevant crates
+      with:
+        name: tsumori
+        path: ${{ github.workspace }}/target/doc

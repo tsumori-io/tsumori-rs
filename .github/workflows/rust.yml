@@ -1,0 +1,31 @@
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: dtolnay/rust-toolchain@1.76
+      with:
+        toolchain: nightly
+
+    - name: Format
+      run: cargo fmt --all -- --check
+
+    - name:
+      run: cargo check --release --all-features
+
+    - name: Test
+      run: cargo test --workspace --all-features

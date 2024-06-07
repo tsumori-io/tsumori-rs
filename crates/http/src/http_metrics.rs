@@ -22,7 +22,7 @@ pub async fn start_metrics_server(cfg: &crate::ServerConfig) {
 
     let app = Router::new().route("/metrics", get(move || ready(recorder_handle.render())));
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", cfg.metrics_port))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cfg.metrics_port))
         .await
         .unwrap();
     tracing::info!("running metrics server on {}...", listener.local_addr().unwrap());

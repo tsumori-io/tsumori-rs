@@ -69,7 +69,7 @@ async fn start_main_server(cfg: &ServerConfig) {
         ));
         // .with_state(client);
 
-    let listener = tokio::net::TcpListener::bind(format!("127.0.0.1:{}", cfg.port))
+    let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cfg.port))
         .await
         .unwrap();
     tracing::info!("running tsumori-bridge server on {}...", listener.local_addr().unwrap());

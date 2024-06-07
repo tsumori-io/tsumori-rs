@@ -17,6 +17,20 @@ The repo contains a CLI to run the Tsumori service; additionally contains crates
 cargo run -- server
 ```
 
+## Docker setup
+
+### Build
+
+```sh
+docker build -t tsumori-io:tsumori -f Dockerfile .
+```
+
+### Run
+
+```sh
+docker compose up
+```
+
 ## CLI usage
 
 ```sh

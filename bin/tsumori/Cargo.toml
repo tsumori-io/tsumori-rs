@@ -1,5 +1,5 @@
 [package]
-name = "bridge"
+name = "tsumori"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,11 +12,11 @@ exclude.workspace = true
 workspace = true
 
 [[bin]]
-name = "bridge"
+name = "tsumori"
 path = "src/main.rs"
 
 [dependencies]
-# bridge
+# tsumori
 http = { path = "../../crates/http" }
 
 # external

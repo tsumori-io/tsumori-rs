@@ -1,0 +1,28 @@
+version: "3"
+
+services:
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tsumori-http-server
+    command: ["server", "--port", "8080", "--metrics-port", "9090"]
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis:/data
+    depends_on:
+      - server
+
+volumes:
+  redis:

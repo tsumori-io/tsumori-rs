@@ -75,4 +75,4 @@ Options:
 ### Supported adapters
 
 - Across
-- DeBridge
+- DeBridge (DLN)

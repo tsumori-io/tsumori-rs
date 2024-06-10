@@ -20,6 +20,7 @@ jobs:
     - uses: dtolnay/rust-toolchain@1.76
       with:
         toolchain: nightly
+        components: rustfmt
 
     - name: Format
       run: cargo fmt --all -- --check

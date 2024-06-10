@@ -1,4 +1,3 @@
-
 use http;
 
 use clap::{Parser, Subcommand, ValueEnum};
@@ -39,7 +38,6 @@ struct ServerCommand {
     #[clap(short, long, value_name = "LOG_LEVEL", default_value_t = LogLevel::Info)]
     log_level: LogLevel,
 }
-
 
 #[derive(Debug, Copy, Clone, ValueEnum, Eq, PartialEq)]
 pub enum LogLevel {

@@ -70,6 +70,13 @@ Options:
   -h, --help                         Print help
 ```
 
+## Examples
+
+```sh
+cargo run -p adapters --example across-limits
+cargo run -p adapters --example dln-create-tx
+```
+
 ## Bridging
 
 ### Supported adapters

@@ -28,26 +28,14 @@ sol! {
 /// https://docs.across.to/reference/api#api-endpoints
 
 #[derive(Debug, serde::Serialize, Clone)]
-struct QueryParams<'a> {
+#[serde(rename_all = "camelCase")]
+struct QuoteQueryParams<'a> {
     origin_chain_id: u32,
-    origin_token: &'a [u8; 20],
+    input_token: &'a str,
     destination_chain_id: u32,
-    destination_token: &'a [u8; 20],
-    recipient: &'a [u8; 20],
+    output_token: &'a str,
+    recipient: &'a str,
     amount: U256,
-}
-
-impl Into<HashMap<&str, String>> for QueryParams<'_> {
-    fn into(self) -> HashMap<&'static str, String> {
-        let mut params = HashMap::new();
-        params.insert("originChainId", self.origin_chain_id.to_string());
-        params.insert("inputToken", hex::encode(self.origin_token));
-        params.insert("destinationChainId", self.destination_chain_id.to_string());
-        params.insert("outputToken", hex::encode(self.destination_token));
-        params.insert("recipient", hex::encode(self.recipient));
-        params.insert("amount", self.amount.to_string());
-        params
-    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -87,23 +75,22 @@ async fn main() {
     // curl "https://app.across.to/api/suggested-fees?originChainId=${ORIGIN_CHAIN_ID}&inputToken=${ORIGIN_TOKEN}&destinationChainId=${DESTINATION_CHAIN_ID}&outputToken=${DESTINATION_TOKEN}&amount=${AMOUNT}&recipient=${RECIPIENT}"
 
     // define query parameters
-    let query_params = QueryParams {
+    let query_params = QuoteQueryParams {
         origin_chain_id: utils::Chain::Base as u32, // Base
-        origin_token: &hex!("833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"), // USDC Base
+        input_token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC Base
         // origin_token: &hex!("d9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA"), // USDCbC Base
         destination_chain_id: utils::Chain::Arbitrum as u32, // Arbitrum
-        destination_token: &hex!("af88d065e77c8cC2239327C5EDb3A432268e5831"), // USDC Arbitrum
+        output_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC Arbitrum
         // destination_token: &hex!("FF970A61A04b1cA14834A43f5dE4533eBDDB5CC8"), // USDC.e
-        recipient: &hex!("000007357111E4789005d4eBfF401a18D99770cE"), // recipient
-        amount: U256::from(2_000_000u32),                             // 4 USDC
+        recipient: "0x000007357111E4789005d4eBfF401a18D99770cE", // recipient
+        amount: U256::from(2000_000u32),                         // 4 USDC
     };
-    let params: HashMap<_, _> = query_params.clone().into();
 
     // let client = reqwest::blocking::Client::new();
     let client = reqwest::Client::new();
     let fee_response_fut = client
         .get("https://app.across.to/api/suggested-fees")
-        .query(&params)
+        .query(&query_params)
         .send();
     let block_timestamp_fut = get_latest_block_timestamp(&query_params.origin_chain_id);
 
@@ -120,6 +107,7 @@ async fn main() {
             fee_response.status()
         );
     };
+    println!("{:#?}", suggested_fees);
 
     let calldata = get_tx_calldata(&query_params, &suggested_fees, latest_block_timestamp);
     println!(
@@ -130,15 +118,15 @@ async fn main() {
 }
 
 fn get_tx_calldata<'a>(
-    query_params: &'_ QueryParams<'_>,
+    query_params: &'_ QuoteQueryParams<'_>,
     fees_response: &'_ SuggestedFeesResponse,
     block_timestamp: u64,
 ) -> String {
     let calldata = depositV3Call {
-        depositor: query_params.recipient.into(), // depositor is recipient
-        recipient: query_params.recipient.into(),
-        inputToken: query_params.origin_token.into(),
-        outputToken: query_params.destination_token.into(),
+        depositor: Address::from_str(query_params.recipient).unwrap(), // depositor is recipient
+        recipient: Address::from_str(query_params.recipient).unwrap(),
+        inputToken: Address::from_str(query_params.input_token).unwrap(),
+        outputToken: Address::from_str(query_params.output_token).unwrap(),
         inputAmount: U256::from(query_params.amount),
         outputAmount: query_params
             .amount
@@ -158,10 +146,11 @@ fn get_tx_calldata<'a>(
 
 async fn get_latest_block_timestamp(chain_id: &u32) -> u64 {
     let src_chain_data = utils::get_supported_chains().get(chain_id).unwrap();
-    let provider = ProviderBuilder::<_, _, AnyNetwork>::default()
-        .on_builtin(src_chain_data.rpc_url)
-        .await
-        .unwrap();
+    let provider: alloy_provider::RootProvider<alloy_transport::BoxTransport, AnyNetwork> =
+        ProviderBuilder::<_, _, AnyNetwork>::default()
+            .on_builtin(src_chain_data.rpc_url)
+            .await
+            .unwrap();
     let latest_block_number = provider.get_block_number().await.unwrap();
     let latest_block = provider
         .get_block_by_number(latest_block_number.into(), false)

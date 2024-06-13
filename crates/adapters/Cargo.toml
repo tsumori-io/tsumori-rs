@@ -14,8 +14,15 @@ workspace = true
 [dependencies]
 utils = { workspace = true }
 
+hex = { workspace = true, features = ["alloc"] }
+hex-literal = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json", "default-tls"] }
 serde = { workspace = true, features = ["derive"] }
+
+# alloy-chains = { version = "0.1.18", default-features = false }
+alloy-sol-types = { git = "https://github.com/alloy-rs/core", tag = "v0.7.5" }
+alloy-primitives = { git = "https://github.com/alloy-rs/core", tag = "v0.7.5" }
+alloy-provider = { git = "https://github.com/alloy-rs/alloy", rev = "a81f9e1", features = ["reqwest"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

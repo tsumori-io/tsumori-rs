@@ -73,9 +73,9 @@ Options:
 ## Examples
 
 ```sh
-cargo run -p adapters --example across-quote
-cargo run -p adapters --example across-limits
-cargo run -p adapters --example dln-create-tx
+cargo run -p bridge --example across-quote
+cargo run -p bridge --example across-limits
+cargo run -p bridge --example dln-create-tx
 ```
 
 ## Bridging

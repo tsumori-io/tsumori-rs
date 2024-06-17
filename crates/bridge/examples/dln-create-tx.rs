@@ -1,4 +1,3 @@
-use bridge::across::QuoteQueryParams;
 use reqwest::blocking::Client;
 use serde::Deserialize;
 use std::{borrow::Cow, collections::HashMap};

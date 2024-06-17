@@ -2,7 +2,7 @@
 members = [
   "bin/tsumori/",
   "crates/http/",
-  "crates/adapters/",
+  "crates/bridge/",
   "crates/utils/",
 ]
 default-members = ["bin/tsumori"]
@@ -31,7 +31,7 @@ strip = "debuginfo"
 # tsumori
 tsumori = { path = "bin/tsumori", default-features = false }
 http = { path = "crates/http", default-features = false }
-adapters = { path = "crates/adapters", default-features = false }
+bridge = { path = "crates/bridge", default-features = false }
 utils = { path = "crates/utils", default-features = false }
 
 # misc

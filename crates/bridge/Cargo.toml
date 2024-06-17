@@ -23,6 +23,8 @@ serde = { workspace = true, features = ["derive"] }
 alloy-sol-types = { git = "https://github.com/alloy-rs/core", tag = "v0.7.5" }
 alloy-primitives = { git = "https://github.com/alloy-rs/core", tag = "v0.7.5" }
 alloy-provider = { git = "https://github.com/alloy-rs/alloy", rev = "a81f9e1", features = ["reqwest"] }
+alloy-transport = { git = "https://github.com/alloy-rs/alloy", rev = "a81f9e1" }
+alloy-transport-http = { git = "https://github.com/alloy-rs/alloy", rev = "a81f9e1" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }

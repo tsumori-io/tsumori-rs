@@ -142,3 +142,54 @@ impl crate::BridgeProvider for DeBridge {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::BridgeProvider;
+    use crate::U256;
+
+    #[tokio::test]
+    async fn get_create_tx() {
+        let debridge = DeBridge::new();
+        let params = CreateTxQueryParams {
+            src_chain_id: 42161,                                              // Arbitrum
+            src_chain_token_in: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC
+            src_chain_token_in_amount: "4000000".into(),                      // 4 USDC
+            src_chain_token_in_sender_permit: None,
+            dst_chain_id: 8453, // USDCbC Base
+            dst_chain_token_out: "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", // USDCbC Base
+            dst_chain_token_out_recipient: "0xD79842424f797feF2B713BAd555eDdD0b6c89a80",
+            dst_chain_token_out_amount: None,
+            src_chain_order_authority_address: "0xD79842424f797feF2B713BAd555eDdD0b6c89a80",
+            dst_chain_order_authority_address: "0xD79842424f797feF2B713BAd555eDdD0b6c89a80",
+            external_call: None,
+        };
+        let response = debridge.get_create_tx(&params).await;
+        assert!(response.is_ok());
+        println!("{:?}", response);
+        // assert!(false);
+    }
+
+    #[tokio::test]
+    async fn get_bridging_data_no_inner_calldata() {
+        let debridge = DeBridge::new();
+        let request = crate::BridgeRequest {
+            src_caller: "0x000007357111E4789005d4eBfF401a18D99770cE".into(),
+            src_chain_id: utils::Chain::Base as u32, // Base
+            src_token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".into(), // USDC Base
+            src_chain_token_in_sender_permit: None,
+            src_amount: U256::from(2000_000u32), // 4 USDC
+            dest_chain_id: utils::Chain::Arbitrum as u32, // Arbitrum
+            dest_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831".into(), // USDC Arbitrum
+            dest_recipient: "0x000007357111E4789005d4eBfF401a18D99770cE".into(), // recipient
+            dest_amount: None,
+            calldata: None,
+            simulate: false,
+        };
+        let response = debridge.get_bridging_data(&request).await;
+        assert!(response.is_ok());
+        println!("{:?}", response);
+        // assert!(false);
+    }
+}

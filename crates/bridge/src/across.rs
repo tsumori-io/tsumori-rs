@@ -255,3 +255,99 @@ impl crate::BridgeProvider for AcrossBridge {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::BridgeProvider;
+
+    #[tokio::test]
+    async fn get_transfer_limits() {
+        let bridge = AcrossBridge::new();
+        let params = LimitQueryParams {
+            origin_chain_id: utils::Chain::Arbitrum as u32,
+            input_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC
+            destination_chain_id: utils::Chain::Base as u32,
+            output_token: "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA", // USDCbC Base
+        };
+
+        let response = bridge.get_transfer_limits(&params).await;
+        assert!(response.is_ok());
+        println!("{:#?}", response.unwrap());
+        // assert!(false);
+    }
+
+    #[tokio::test]
+    async fn get_suggested_fees() {
+        let bridge = AcrossBridge::new();
+        let params = QuoteQueryParams {
+            origin_chain_id: utils::Chain::Base as u32, // Base
+            input_token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC Base
+            destination_chain_id: utils::Chain::Arbitrum as u32, // Arbitrum
+            output_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC Arbitrum
+            recipient: "0x000007357111E4789005d4eBfF401a18D99770cE", // recipient
+            amount: U256::from(2000_000u32),            // 4 USDC
+        };
+
+        let response = bridge.get_suggested_fees(&params).await;
+        assert!(response.is_ok());
+        println!("{:#?}", response.unwrap());
+        // assert!(false);
+    }
+
+    #[tokio::test]
+    async fn get_latest_block_timestamp() {
+        let bridge = AcrossBridge::new();
+        let chain_id = utils::Chain::Arbitrum as u32;
+        let timestamp = bridge.get_latest_block_timestamp(chain_id).await;
+        println!("{:?}", timestamp);
+        // assert!(false);
+    }
+
+    #[test]
+    fn get_tx_calldata() {
+        let query_params = QuoteQueryParams {
+            origin_chain_id: utils::Chain::Base as u32, // Base
+            input_token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC Base
+            destination_chain_id: utils::Chain::Arbitrum as u32, // Arbitrum
+            output_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831", // USDC Arbitrum
+            recipient: "0x000007357111E4789005d4eBfF401a18D99770cE", // recipient
+            amount: U256::from(2000_000u32),            // 4 USDC
+        };
+        let fees_response_timestamp = "1634160000";
+        let fees_response_total_relay_fee = "1000";
+        let block_timestamp: u64 = 1634150000;
+
+        let calldata = AcrossBridge::get_tx_calldata(
+            query_params.recipient,
+            &query_params,
+            fees_response_timestamp.parse().unwrap(),
+            fees_response_total_relay_fee.parse::<U256>().unwrap(),
+            block_timestamp,
+            None,
+        );
+        assert_eq!(calldata, "7b939232000000000000000000000000000007357111e4789005d4ebff401a18d99770ce000000000000000000000000000007357111e4789005d4ebff401a18d99770ce000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e583100000000000000000000000000000000000000000000000000000000001e848000000000000000000000000000000000000000000000000000000000001e8098000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000061674d8000000000000000000000000000000000000000000000000000000000616726e8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000000");
+    }
+
+    #[tokio::test]
+    async fn get_bridging_data_no_inner_calldata() {
+        let bridge = AcrossBridge::new();
+        let request = crate::BridgeRequest {
+            src_chain_id: utils::Chain::Base as u32, // Base
+            src_token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913".into(), // USDC Base
+            src_caller: "0x000007357111E4789005d4eBfF401a18D99770cE".into(), // caller is recipient
+            src_amount: U256::from(2000_000u32),     // 4 USDC
+            src_chain_token_in_sender_permit: None,
+            dest_chain_id: utils::Chain::Arbitrum as u32, // Arbitrum
+            dest_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831".into(), // USDC Arbitrum
+            dest_recipient: "0x000007357111E4789005d4eBfF401a18D99770cE".into(), // recipient
+            dest_amount: None,
+            calldata: None,
+            simulate: false,
+        };
+        let response = bridge.get_bridging_data(&request).await;
+        assert!(response.is_ok());
+        println!("{:#?}", response.unwrap());
+        // assert!(false);
+    }
+}

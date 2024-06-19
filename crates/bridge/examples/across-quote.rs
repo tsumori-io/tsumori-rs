@@ -1,68 +1,9 @@
-use serde::Deserialize;
-use std::{collections::HashMap, str::FromStr};
+use std::str::FromStr;
 
-use alloy_primitives::{Address, U256};
-use alloy_provider::{network::AnyNetwork, Provider, ProviderBuilder};
-use alloy_sol_types::{sol, sol_data::Uint, SolCall, SolType};
+use alloy::primitives::{Address, U256};
+use alloy::providers::{Provider, ProviderBuilder};
+use alloy::sol_types::SolCall;
 use hex_literal::hex;
-
-sol! {
-    #[derive(Debug)]
-    function depositV3(
-        address depositor,
-        address recipient,
-        address inputToken,
-        address outputToken,
-        uint256 inputAmount,
-        uint256 outputAmount,
-        uint256 destinationChainId,
-        address exclusiveRelayer,
-        uint32 quoteTimestamp,
-        uint32 fillDeadline,
-        uint32 exclusivityDeadline,
-        bytes calldata message
-    ) external;
-}
-
-/// https://docs.across.to/integration-guides/across-bridge-integration#getting-a-quote
-/// https://docs.across.to/reference/api#api-endpoints
-
-#[derive(Debug, serde::Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-struct QuoteQueryParams<'a> {
-    origin_chain_id: u32,
-    input_token: &'a str,
-    destination_chain_id: u32,
-    output_token: &'a str,
-    recipient: &'a str,
-    amount: U256,
-}
-
-#[derive(Deserialize, Debug)]
-struct FeeDetails {
-    pct: String,
-    total: String,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct SuggestedFeesResponse {
-    capital_fee_pct: String,
-    capital_fee_total: String,
-    relay_gas_fee_pct: String,
-    relay_gas_fee_total: String,
-    relay_fee_pct: String,
-    relay_fee_total: String,
-    lp_fee_pct: String,
-    timestamp: String,
-    is_amount_too_low: bool,
-    quote_block: String,
-    spoke_pool_address: String,
-    total_relay_fee: FeeDetails,
-    relayer_capital_fee: FeeDetails,
-    relayer_gas_fee: FeeDetails,
-    lp_fee: FeeDetails,
-}
 
 #[tokio::main]
 async fn main() {
@@ -75,7 +16,7 @@ async fn main() {
     // curl "https://app.across.to/api/suggested-fees?originChainId=${ORIGIN_CHAIN_ID}&inputToken=${ORIGIN_TOKEN}&destinationChainId=${DESTINATION_CHAIN_ID}&outputToken=${DESTINATION_TOKEN}&amount=${AMOUNT}&recipient=${RECIPIENT}"
 
     // define query parameters
-    let query_params = QuoteQueryParams {
+    let query_params = bridge::across::QuoteQueryParams {
         origin_chain_id: utils::Chain::Base as u32, // Base
         input_token: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", // USDC Base
         // origin_token: &hex!("d9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA"), // USDCbC Base
@@ -99,14 +40,15 @@ async fn main() {
         tokio::join!(fee_response_fut, block_timestamp_fut);
     let fee_response = fee_response.unwrap();
 
-    let suggested_fees: SuggestedFeesResponse = if fee_response.status().is_success() {
-        fee_response.json().await.unwrap()
-    } else {
-        panic!(
-            "failed to fetch suggested fees. Status: {}",
-            fee_response.status()
-        );
-    };
+    let suggested_fees: bridge::across::SuggestedFeesResponse =
+        if fee_response.status().is_success() {
+            fee_response.json().await.unwrap()
+        } else {
+            panic!(
+                "failed to fetch suggested fees. Status: {}",
+                fee_response.status()
+            );
+        };
     println!("{:#?}", suggested_fees);
 
     let calldata = get_tx_calldata(&query_params, &suggested_fees, latest_block_timestamp);
@@ -118,11 +60,11 @@ async fn main() {
 }
 
 fn get_tx_calldata<'a>(
-    query_params: &'_ QuoteQueryParams<'_>,
-    fees_response: &'_ SuggestedFeesResponse,
+    query_params: &'_ bridge::across::QuoteQueryParams<'_>,
+    fees_response: &'_ bridge::across::SuggestedFeesResponse,
     block_timestamp: u64,
 ) -> String {
-    let calldata = depositV3Call {
+    let calldata = bridge::across::depositV3Call {
         depositor: Address::from_str(query_params.recipient).unwrap(), // depositor is recipient
         recipient: Address::from_str(query_params.recipient).unwrap(),
         inputToken: Address::from_str(query_params.input_token).unwrap(),
@@ -146,11 +88,7 @@ fn get_tx_calldata<'a>(
 
 async fn get_latest_block_timestamp(chain_id: &u32) -> u64 {
     let src_chain_data = utils::get_supported_chains().get(chain_id).unwrap();
-    let provider: alloy_provider::RootProvider<alloy_transport::BoxTransport, AnyNetwork> =
-        ProviderBuilder::<_, _, AnyNetwork>::default()
-            .on_builtin(src_chain_data.rpc_url)
-            .await
-            .unwrap();
+    let provider = ProviderBuilder::new().on_http(src_chain_data.rpc_url.parse().unwrap());
     let latest_block_number = provider.get_block_number().await.unwrap();
     let latest_block = provider
         .get_block_by_number(latest_block_number.into(), false)

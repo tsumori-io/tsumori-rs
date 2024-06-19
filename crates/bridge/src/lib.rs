@@ -1,6 +1,8 @@
 use alloy::primitives::U256;
 use std::future::Future;
 
+pub mod debridge;
+
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
 pub enum SupportedProviders {
     Across,

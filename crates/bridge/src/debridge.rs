@@ -2,6 +2,8 @@ use crate::{BridgeRequest, BridgeResponse, TxData};
 use std::borrow::Cow;
 use std::{collections::HashMap, str::FromStr};
 
+use eyre::Result;
+
 #[derive(Debug, serde::Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTxQueryParams<'a> {
@@ -58,6 +60,7 @@ struct TokenInfo {
     max_theoretical_amount: Option<String>,
     approximate_operating_expense: Option<String>,
     mutated_with_operating_expense: Option<bool>,
+    max_refund_amount: Option<String>,
 }
 
 #[derive(serde::Deserialize, Debug)]
@@ -70,14 +73,14 @@ struct CostDetails {
     amount_out: String,
     #[serde(rename = "type")]
     cost_type: String,
-    payload: HashMap<String, String>,
+    payload: Option<HashMap<String, String>>,
 }
 
 #[derive(serde::Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct Estimation {
     src_chain_token_in: TokenInfo,
-    dst_chain_token_out: TokenInfo,
+    src_chain_token_out: Option<TokenInfo>,
     costs_details: Vec<CostDetails>,
     recommended_slippage: f64,
 }
@@ -117,15 +120,20 @@ impl DeBridge {
     pub async fn get_create_tx(
         &self,
         params: &CreateTxQueryParams<'_>,
-    ) -> Result<CreateTxResponse, reqwest::Error> {
+    ) -> Result<CreateTxResponse> {
         let response = self
             .client
             .get("https://api.dln.trade/v1.0/dln/order/create-tx")
             .query(&params)
             .send()
-            .await
-            .unwrap();
-        response.json().await
+            .await?;
+        if !response.status().is_success() {
+            return Err(eyre::eyre!(
+                "DeBridge: failed to get create-tx: {}",
+                response.text().await?
+            ));
+        }
+        Ok(response.json().await?)
     }
 }
 
@@ -133,7 +141,7 @@ impl crate::BridgeProvider for DeBridge {
     async fn get_bridging_data(
         &self,
         request: &crate::BridgeRequest,
-    ) -> Result<crate::BridgeResponse, Box<dyn std::error::Error>> {
+    ) -> eyre::Result<crate::BridgeResponse> {
         let params = request.into();
         let response = self.get_create_tx(&params).await?;
         Ok(crate::BridgeResponse {

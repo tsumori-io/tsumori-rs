@@ -1,11 +1,13 @@
 use crate::U256;
+use std::{collections::HashMap, str::FromStr};
+
 use alloy::providers::{Provider, ProviderBuilder, RootProvider};
 use alloy::sol_types::SolCall;
 use alloy::{primitives::Address, sol};
+use eyre::Result;
 use hex::FromHex;
 use hex_literal::hex;
 use serde::Deserialize;
-use std::{collections::HashMap, str::FromStr};
 
 sol! {
     #[derive(Debug)]
@@ -116,7 +118,7 @@ impl AcrossBridge {
         let supported_providers = utils::get_supported_chains()
             .iter()
             .map(|(id, chain)| {
-                let rpc_url = reqwest::Url::parse(chain.rpc_url).unwrap();
+                let rpc_url = reqwest::Url::parse(chain.rpc_url).unwrap(); // infallible
                 let provider = ProviderBuilder::new().on_http(rpc_url);
                 (*id, provider)
             })
@@ -131,29 +133,43 @@ impl AcrossBridge {
     pub async fn get_transfer_limits(
         &self,
         params: &LimitQueryParams<'_>,
-    ) -> Result<TransferLimitsResponse, reqwest::Error> {
+    ) -> Result<TransferLimitsResponse> {
         let url = "https://app.across.to/api/limits";
-        let response = self.client.get(url).query(params).send().await.unwrap();
-        response.json().await
+        let response = self.client.get(url).query(params).send().await?;
+        if !response.status().is_success() {
+            return Err(eyre::eyre!(
+                "failed to get transfer limits: {}",
+                response.text().await?
+            ));
+        }
+        Ok(response.json().await?)
     }
 
     pub async fn get_suggested_fees(
         &self,
         params: &QuoteQueryParams<'_>,
-    ) -> Result<SuggestedFeesResponse, reqwest::Error> {
+    ) -> Result<SuggestedFeesResponse> {
         let url = "https://app.across.to/api/suggested-fees";
-        let response = self.client.get(url).query(params).send().await.unwrap();
-        response.json().await
+        let response = self.client.get(url).query(params).send().await?;
+        if !response.status().is_success() {
+            return Err(eyre::eyre!(
+                "failed to get suggested fees: {}",
+                response.text().await?
+            ));
+        }
+        Ok(response.json().await?)
     }
 
-    async fn get_latest_block_timestamp(&self, chain_id: u32) -> Result<u64, reqwest::Error> {
-        let provider = self.providers.get(&chain_id).unwrap();
-        let latest_block_number = provider.get_block_number().await.unwrap();
+    async fn get_latest_block_timestamp(&self, chain_id: u32) -> Result<u64> {
+        let provider = self
+            .providers
+            .get(&chain_id)
+            .ok_or_else(|| eyre::eyre!("unsupported chain id: {}", chain_id))?;
+        let latest_block_number = provider.get_block_number().await?;
         let latest_block = provider
             .get_block_by_number(latest_block_number.into(), false)
-            .await
-            .unwrap()
-            .unwrap();
+            .await?
+            .ok_or_else(|| eyre::eyre!("block not found"))?;
         Ok(latest_block.header.timestamp)
     }
 
@@ -164,17 +180,17 @@ impl AcrossBridge {
         fees_response_total_relay_fee: U256,
         block_timestamp: u64,
         calldata: Option<&'a str>,
-    ) -> String {
+    ) -> Result<String> {
         let calldata = depositV3Call {
-            depositor: Address::from_str(query_params.recipient).unwrap(), // depositor is recipient
-            recipient: Address::from_str(query_params.recipient).unwrap(),
-            inputToken: Address::from_str(query_params.input_token).unwrap(),
-            outputToken: Address::from_str(query_params.output_token).unwrap(),
+            depositor: Address::from_str(caller)?,
+            recipient: Address::from_str(query_params.recipient)?,
+            inputToken: Address::from_str(query_params.input_token)?,
+            outputToken: Address::from_str(query_params.output_token)?,
             inputAmount: U256::from(query_params.amount),
             outputAmount: query_params
                 .amount
                 .checked_sub(fees_response_total_relay_fee)
-                .unwrap(),
+                .ok_or_else(|| eyre::eyre!("output amount underflow"))?,
             destinationChainId: U256::from(query_params.destination_chain_id),
             exclusiveRelayer: hex!("0000000000000000000000000000000000000000").into(),
             quoteTimestamp: fees_response_timestamp,
@@ -187,7 +203,7 @@ impl AcrossBridge {
                 .into(),
         };
         let data = hex::encode(calldata.abi_encode());
-        data
+        Ok(data)
     }
 }
 
@@ -195,11 +211,10 @@ impl crate::BridgeProvider for AcrossBridge {
     async fn get_bridging_data(
         &self,
         request: &crate::BridgeRequest,
-    ) -> Result<crate::BridgeResponse, Box<dyn std::error::Error>> {
+    ) -> eyre::Result<crate::BridgeResponse> {
         let query_params: QuoteQueryParams = request.into();
         let limits_query_params: LimitQueryParams = (&query_params).into();
 
-        // TODO: do the below in parallel
         let fees_response_fut = self.get_suggested_fees(&query_params);
         let limits_response_fut = self.get_transfer_limits(&limits_query_params);
         let block_timestamp_fut = self.get_latest_block_timestamp(request.src_chain_id);
@@ -212,7 +227,7 @@ impl crate::BridgeProvider for AcrossBridge {
         };
 
         if request.src_amount > U256::from_str(&limits_response.max_deposit)? {
-            return Err("requested amount exceeds max deposit limit".into());
+            return Err(eyre::eyre!("requested amount exceeds max deposit limit"));
         }
 
         if let Some(dest_amount) = request.dest_amount {
@@ -221,7 +236,9 @@ impl crate::BridgeProvider for AcrossBridge {
                 .checked_sub(fees_response.total_relay_fee.total.parse::<U256>().unwrap())
                 .unwrap();
             if dest_amount < dest_output_amount {
-                return Err("requested dest amount is less than output amount".into());
+                return Err(eyre::eyre!(
+                    "requested dest amount is less than output amount"
+                ));
             }
         }
 
@@ -233,7 +250,7 @@ impl crate::BridgeProvider for AcrossBridge {
             block_timestamp,
             // request.calldata.as_ref().map(|tx| tx.data.as_str()),
             "".into(),
-        );
+        )?;
 
         // if let Some(caller) = request.src_caller {
         //     // TODO: check if caller has approval
@@ -325,7 +342,8 @@ mod tests {
             fees_response_total_relay_fee.parse::<U256>().unwrap(),
             block_timestamp,
             None,
-        );
+        )
+        .unwrap();
         assert_eq!(calldata, "7b939232000000000000000000000000000007357111e4789005d4ebff401a18d99770ce000000000000000000000000000007357111e4789005d4ebff401a18d99770ce000000000000000000000000833589fcd6edb6e08f4c7c32d4f71b54bda02913000000000000000000000000af88d065e77c8cc2239327c5edb3a432268e583100000000000000000000000000000000000000000000000000000000001e848000000000000000000000000000000000000000000000000000000000001e8098000000000000000000000000000000000000000000000000000000000000a4b100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000061674d8000000000000000000000000000000000000000000000000000000000616726e8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001800000000000000000000000000000000000000000000000000000000000000000");
     }
 

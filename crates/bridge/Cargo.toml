@@ -16,6 +16,7 @@ utils = { workspace = true }
 
 # alloy = { workspace = true, features = ["full", "reqwest"] }
 alloy = { workspace = true, features = ["providers", "provider-http", "reqwest", "sol-types", "transport-http"] }
+eyre = { workspace = true }
 hex = { workspace = true, features = ["alloc"] }
 hex-literal = { workspace = true }
 reqwest = { workspace = true, features = ["blocking", "json", "default-tls"] }
@@ -25,3 +26,5 @@ tokio = { workspace = true, features = ["full"] } # todo: use specific features
 # alloy-chains = { version = "0.1.18", default-features = false }
 # cast = { git = "https://github.com/foundry-rs/foundry", rev = "6179312", default-features = false }
 
+[dev-dependencies]
+eyre = { workspace = true, default-features = true }

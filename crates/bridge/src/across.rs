@@ -368,4 +368,24 @@ mod tests {
         println!("{:#?}", response.unwrap());
         // assert!(false);
     }
+
+    #[tokio::test]
+    async fn get_bridging_data_unsupported_token_fails() {
+        let bridge = AcrossBridge::new();
+        let request = crate::BridgeRequest {
+            src_chain_id: utils::Chain::Base as u32, // Base
+            src_token: "0xd9aAEc86B65D86f6A7B5B1b0c42FFA531710b6CA".into(), // USDCbC Base // NOTE: not supported by across
+            src_caller: "0x000007357111E4789005d4eBfF401a18D99770cE".into(), // caller is recipient
+            src_amount: crate::U256::from(2000_000u32),                     // 2 USDC
+            src_chain_token_in_sender_permit: None,
+            dest_chain_id: utils::Chain::Arbitrum as u32, // Arbitrum
+            dest_token: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831".into(), // USDC Arbitrum
+            dest_recipient: "0x000007357111E4789005d4eBfF401a18D99770cE".into(), // recipient
+            dest_amount: None,
+            calldata: None,
+            simulate: false,
+        };
+        let response = bridge.get_bridging_data(&request).await;
+        assert!(!response.is_ok());
+    }
 }

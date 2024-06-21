@@ -1,16 +1,17 @@
+use core::future::Future;
+
 use alloy::primitives::U256;
-use std::future::Future;
 
 pub mod across;
 pub mod debridge;
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SupportedProviders {
     Across,
     DeBridge,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum PermitSignature {
     EIP2612(String),
     Permit2(String),
@@ -40,7 +41,7 @@ pub struct BridgeRequest {
     simulate: bool,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(PartialEq))]
 pub struct TxData {
     data: String,
@@ -48,7 +49,7 @@ pub struct TxData {
     value: String,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum BridgeAction {
     /// If no approvals are required, the bridging tx can be called directly
     BridgingTx(TxData),
@@ -70,7 +71,7 @@ pub enum BridgeAction {
     BridgeApprovalTx(SupportedProviders, TxData),
 }
 
-#[derive(Debug, serde::Serialize, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BridgeResponse {
     provider: SupportedProviders,
@@ -83,5 +84,5 @@ pub trait BridgeProvider {
     fn get_bridging_data(
         &self,
         request: &BridgeRequest,
-    ) -> impl Future<Output = Result<BridgeResponse, Box<dyn std::error::Error>>> + Send;
+    ) -> impl Future<Output = eyre::Result<BridgeResponse>> + Send;
 }

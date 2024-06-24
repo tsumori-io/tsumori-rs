@@ -1,24 +1,29 @@
-use std::{convert::Infallible, future::ready, time::{Duration, Instant}};
+use std::{
+    convert::Infallible,
+    future::ready,
+    time::{Duration, Instant},
+};
 
 use axum::{
     body::{Body, Bytes},
     extract::{MatchedPath, Request, State},
-    http::{HeaderMap, HeaderName, HeaderValue, StatusCode, Method},
-    Json,
+    http::{HeaderMap, HeaderName, HeaderValue, Method, StatusCode},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
-    Router,
+    Json, Router,
 };
+use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
+use serde_json::{json, Value};
 use tower_http::{
+    cors::{Any, CorsLayer},
     timeout::TimeoutLayer,
     trace::TraceLayer,
 };
-use serde_json::{json, Value};
-use metrics_exporter_prometheus::{Matcher, PrometheusBuilder, PrometheusHandle};
 use tracing::Span;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+mod bridge_router;
 mod http_metrics;
 
 pub(crate) const PKG_NAME: &str = concat!("", env!("CARGO_PKG_NAME"));
@@ -35,12 +40,13 @@ pub struct ServerConfig {
 pub fn run_server(cfg: ServerConfig) {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| format!("{}={},tower_http=debug", PKG_NAME, cfg.log_level).into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                format!("{}={},tower_http=debug", PKG_NAME, cfg.log_level).into()
+            }),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
-    
+
     // creates a new default tokio multi-thread [Runtime](tokio::runtime::Runtime) with all features enabled
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -60,20 +66,37 @@ pub fn run_server(cfg: ServerConfig) {
 async fn start_main_server(cfg: &ServerConfig) {
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
-        .route("/version", get(|| async { Json(json!({ "version": VERSION })) }))
+        .route(
+            "/version",
+            get(|| async { Json(json!({ "version": VERSION })) }),
+        )
+        .nest("/api/v1/bridge", bridge_router::router())
         // Add some logging so we can see the streams going through
         .route_layer(middleware::from_fn(http_metrics::track_request_metrics))
         .layer((
-            TraceLayer::new_for_http().on_body_chunk(|chunk: &Bytes, _latency: Duration, _span: &Span| tracing::debug!("streaming {} bytes", chunk.len())),
+            TraceLayer::new_for_http().on_body_chunk(
+                |chunk: &Bytes, _latency: Duration, _span: &Span| {
+                    tracing::debug!("streaming {} bytes", chunk.len())
+                },
+            ),
             TimeoutLayer::new(Duration::from_secs(cfg.req_timeout.into())),
+            CorsLayer::new()
+                .allow_origin("http://0.0.0.0:3000".parse::<HeaderValue>().unwrap())
+                .allow_methods(Any),
         ));
-        // .with_state(client);
+    // .with_state(client);
 
     let listener = tokio::net::TcpListener::bind(format!("0.0.0.0:{}", cfg.port))
         .await
         .unwrap();
-    tracing::info!("running tsumori-bridge server on {}...", listener.local_addr().unwrap());
-    axum::serve(listener, app).with_graceful_shutdown(shutdown_signal()).await.unwrap();
+    tracing::info!(
+        "running tsumori-bridge server on {}...",
+        listener.local_addr().unwrap()
+    );
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown_signal())
+        .await
+        .unwrap();
 }
 
 // support graceful shutdown

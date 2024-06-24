@@ -70,9 +70,17 @@ Options:
   -h, --help                         Print help
 ```
 
+## Examples
+
+```sh
+cargo run -p bridge --example across-quote
+cargo run -p bridge --example across-limits
+cargo run -p bridge --example dln-create-tx
+```
+
 ## Bridging
 
 ### Supported adapters
 
 - Across
-- DeBridge
+- DeBridge (DLN)

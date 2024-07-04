@@ -8,6 +8,7 @@ use eyre::Result;
 use hex::FromHex;
 use hex_literal::hex;
 use serde::Deserialize;
+use utils::AllowanceAction;
 
 sol! {
     #[derive(Debug)]
@@ -25,6 +26,9 @@ sol! {
         uint32 exclusivityDeadline,
         bytes calldata message
     ) external;
+
+    // check approval for caller
+    function allowance(address owner, address spender) external view returns (uint256);
 }
 
 #[derive(Debug, serde::Serialize, Clone)]
@@ -212,6 +216,11 @@ impl crate::BridgeProvider for AcrossBridge {
         &self,
         request: &crate::BridgeRequest,
     ) -> eyre::Result<crate::BridgeResponse> {
+        let provider = self
+            .providers
+            .get(&request.src_chain_id)
+            .ok_or_else(|| eyre::eyre!("unsupported chain id: {}", request.src_chain_id))?;
+
         let query_params: QuoteQueryParams = request.into();
         let limits_query_params: LimitQueryParams = (&query_params).into();
 
@@ -233,8 +242,8 @@ impl crate::BridgeProvider for AcrossBridge {
         if let Some(dest_amount) = request.dest_amount {
             let dest_output_amount = query_params
                 .amount
-                .checked_sub(fees_response.total_relay_fee.total.parse::<U256>().unwrap())
-                .unwrap();
+                .checked_sub(fees_response.total_relay_fee.total.parse::<U256>()?)
+                .ok_or_else(|| eyre::eyre!("output amount underflow"))?;
             if dest_amount < dest_output_amount {
                 return Err(eyre::eyre!(
                     "requested dest amount is less than output amount"
@@ -242,6 +251,23 @@ impl crate::BridgeProvider for AcrossBridge {
             }
         }
 
+        let allowance_action = utils::get_token_allowance_action(
+            provider,
+            &Address::from_str(&request.src_token)?,
+            &request.src_amount,
+            &Address::from_str(&request.src_caller)?,
+            &Address::from_str(&fees_response.spoke_pool_address)?,
+        )
+        .await?;
+
+        // if there is an pre-allowance tx/sig/action required, it must be returned
+        // to be executed by the caller
+        if !matches!(allowance_action, AllowanceAction::Ok) {
+            // TODO: convert allowance action as-is, into BridgeResponse
+            // TODO: impl From<AllowanceAction> for BridgeResponse
+        };
+
+        // no pre-aproval/signature action is required, return bridging calldata
         let calldata = Self::get_tx_calldata(
             request.src_caller.as_str(),
             &query_params,
@@ -251,12 +277,6 @@ impl crate::BridgeProvider for AcrossBridge {
             // request.calldata.as_ref().map(|tx| tx.data.as_str()),
             "".into(),
         )?;
-
-        // if let Some(caller) = request.src_caller {
-        //     // TODO: check if caller has approval
-        //     // TODO: do this in parallel
-        // }
-
         Ok(crate::BridgeResponse {
             provider: crate::SupportedProviders::Across,
             bridge_action: crate::BridgeAction::BridgingTx(crate::TxData {

@@ -4,6 +4,7 @@ use alloy::primitives::U256;
 
 pub mod across;
 pub mod debridge;
+pub mod service;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SupportedProviders {

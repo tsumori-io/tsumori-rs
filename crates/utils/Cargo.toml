@@ -12,4 +12,11 @@ exclude.workspace = true
 workspace = true
 
 [dependencies]
+alloy = { workspace = true, features = ["providers", "provider-http", "reqwest", "rpc", "rpc-types", "sol-types", "transport-http"] }
+eyre = { workspace = true }
+reqwest = { workspace = true, features = ["json", "default-tls"] }
 serde = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full"] } # todo: use specific features
+# alloy = { workspace = true, features = ["full", "node-bindings"] }

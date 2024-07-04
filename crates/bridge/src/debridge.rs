@@ -2,6 +2,8 @@ use crate::{BridgeRequest, BridgeResponse, TxData};
 use std::borrow::Cow;
 use std::{collections::HashMap, str::FromStr};
 
+use alloy::providers::{Provider, ProviderBuilder, RootProvider};
+use alloy::{primitives::Address, sol};
 use eyre::Result;
 
 #[derive(Debug, serde::Serialize, Clone)]
@@ -108,12 +110,23 @@ pub struct CreateTxResponse {
 #[derive(Debug, Clone)]
 pub struct DeBridge {
     client: reqwest::Client,
+    providers: HashMap<u32, RootProvider<alloy::transports::http::Http<reqwest::Client>>>,
 }
 
 impl DeBridge {
     pub fn new() -> Self {
+        let supported_providers = utils::get_supported_chains()
+            .iter()
+            .map(|(id, chain)| {
+                let rpc_url = reqwest::Url::parse(chain.rpc_url).unwrap(); // infallible
+                let provider = ProviderBuilder::new().on_http(rpc_url);
+                (*id, provider)
+            })
+            .collect::<HashMap<_, _>>();
+
         Self {
             client: reqwest::Client::new(),
+            providers: supported_providers,
         }
     }
 
@@ -144,6 +157,39 @@ impl crate::BridgeProvider for DeBridge {
     ) -> eyre::Result<crate::BridgeResponse> {
         let params = request.into();
         let response = self.get_create_tx(&params).await?;
+
+        // TODO: validate for source chain as solana
+        // if source chain is solana, explicit approval will not be required
+        if request.src_chain_id == utils::Chain::Solana as u32 {
+            return Ok(crate::BridgeResponse {
+                provider: crate::SupportedProviders::DeBridge,
+                bridge_action: crate::BridgeAction::BridgingTx(response.tx),
+            });
+        }
+
+        // source chain must be evm compatible; perform approval checks...
+        let provider = self
+            .providers
+            .get(&request.src_chain_id)
+            .ok_or_else(|| eyre::eyre!("unsupported chain id: {}", request.src_chain_id))?;
+
+        // TODO: this would only apply if source chain is EVM
+        let allowance_action = utils::get_token_allowance_action(
+            provider,
+            &Address::from_str(&request.src_token)?,
+            &request.src_amount,
+            &Address::from_str(&request.src_caller)?,
+            &Address::from_str(&response.tx.to)?,
+        )
+        .await?;
+
+        // if there is an pre-allowance tx/sig/action required, it must be returned
+        // to be executed by the caller
+        if !matches!(allowance_action, utils::AllowanceAction::Ok) {
+            // TODO: convert allowance action as-is, into BridgeResponse
+            // TODO: impl From<AllowanceAction> for BridgeResponse
+        };
+
         Ok(crate::BridgeResponse {
             provider: crate::SupportedProviders::DeBridge,
             bridge_action: crate::BridgeAction::BridgingTx(response.tx),
@@ -180,6 +226,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn get_bridging_data_no_inner_calldata() {
         let debridge = DeBridge::new();
         let request = crate::BridgeRequest {

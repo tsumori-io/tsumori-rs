@@ -26,7 +26,7 @@ jobs:
       run: cargo fmt --all -- --check
 
     - name: Check
-      run: cargo check --release --all-features
+      run: cargo check --release --all --all-features
 
     - name: Test
-      run: cargo test --workspace --all-features
+      run: cargo test --workspace --all --all-features

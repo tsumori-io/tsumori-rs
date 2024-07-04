@@ -37,6 +37,11 @@ pub struct ServerConfig {
     pub log_level: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct AppState {
+    pub bridge_service: bridge::service::BridgeService,
+}
+
 pub fn run_server(cfg: ServerConfig) {
     tracing_subscriber::registry()
         .with(
@@ -64,13 +69,17 @@ pub fn run_server(cfg: ServerConfig) {
 }
 
 async fn start_main_server(cfg: &ServerConfig) {
+    let app_state = AppState {
+        bridge_service: bridge::service::BridgeService::new(),
+    };
+
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
         .route(
             "/version",
             get(|| async { Json(json!({ "version": VERSION })) }),
         )
-        .nest("/api/v1/bridge", bridge_router::router())
+        .nest("/api/v1/bridge", bridge_router::router(app_state))
         // Add some logging so we can see the streams going through
         .route_layer(middleware::from_fn(http_metrics::track_request_metrics))
         .layer((
@@ -122,15 +131,4 @@ async fn shutdown_signal() {
         _ = ctrl_c => {},
         _ = terminate => {},
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // #[test]
-    // fn it_works() {
-    //     let result = add(2, 2);
-    //     assert_eq!(result, 4);
-    // }
 }

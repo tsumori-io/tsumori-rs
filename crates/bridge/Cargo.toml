@@ -15,7 +15,7 @@ workspace = true
 utils = { workspace = true }
 
 # alloy = { workspace = true, features = ["full", "reqwest"] }
-alloy = { workspace = true, features = ["providers", "provider-http", "reqwest", "sol-types", "transport-http"] }
+alloy = { workspace = true, features = ["providers", "provider-http", "reqwest", "rpc", "rpc-types", "sol-types", "transport-http"] }
 eyre = { workspace = true }
 hex = { workspace = true, features = ["alloc"] }
 hex-literal = { workspace = true }

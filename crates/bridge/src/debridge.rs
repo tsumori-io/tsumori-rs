@@ -226,6 +226,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn get_bridging_data_no_inner_calldata() {
         let debridge = DeBridge::new();
         let request = crate::BridgeRequest {

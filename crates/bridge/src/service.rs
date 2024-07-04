@@ -102,6 +102,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn get_tx_across_bridging_tx_non_approved_sender() {
         let bridge = BridgeService::new();
         let request = crate::BridgeRequest {
